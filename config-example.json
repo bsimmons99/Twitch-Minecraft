@@ -2,6 +2,12 @@
     "client_id": "xxx",
     "client_secret": "xxx",
     "redirect_uri": "https://example.com/twitchauth",
+    
+    "oauth": {
+        "username": "xxx",
+        "password": "oauth:xxx"
+    },
+    "channels": ["angelnaomi"],
 
     "broadcaster_info": {
         "id": "645667972",

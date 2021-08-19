@@ -29,6 +29,8 @@ var app = new Vue({
                 // console.warn('err', status);
                 if (status === 404) {
                     app.update_error = true;
+                } else if (status === 401) {
+                    location.reload();
                 }
             });
         },

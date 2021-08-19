@@ -17,6 +17,7 @@ CREATE TABLE User(
     minecraft_uuid_cache TEXT,
     time TEXT,
     is_admin BOOLEAN DEFAULT FALSE,
+    redeemed_whitelist BOOLEAN DEFAULT FALSE,
 
     UNIQUE(minecraft_user, twitch_id)
 );

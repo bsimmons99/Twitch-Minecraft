@@ -3,6 +3,7 @@ const express = require('express');
 const https = require('https');
 const cron = require('node-cron');
 const { exec } = require("child_process");
+const tmi = require('tmi.js');
 
 const cryptoRandomString = require('crypto-random-string');
 
@@ -45,14 +46,14 @@ function checkauth(req, res) {
         method: 'POST'
     },
         function (resb) {
-            console.log('statusCode:', resb.statusCode);
+            // console.log('statusCode:', resb.statusCode);
             let data = '';
             resb.on('data', function (stream) {
                 data += stream;
             });
             resb.on('end', async function () {
                 data = JSON.parse(data);
-                console.log(data);
+                // console.log(data);
 
                 let userData = await queryTwitchAPI('/users', [], data.access_token);
                 if ('error' in userData) {
@@ -250,7 +251,7 @@ function nameToUUID(username) {
  */
 function updateTwitchUserStatus(db, access_token) {
     return new Promise(async (resolve, reject) => {
-        console.log('A');
+        // console.log('A');
         try {
             let userData = await queryTwitchAPI('/users', [], access_token);
             if ('error' in userData) {
@@ -294,8 +295,17 @@ function updateTwitchUserStatus(db, access_token) {
     });
 }
 
-router.get('/session_info', function (req, res, next) {
-    res.json(req.session);
+// router.get('/session_info', function (req, res, next) {
+    // if (req.session.is_admin === true) {
+        // res.json(req.session);
+        // return;
+    // }
+    // res.sendStatus(401);
+// });
+
+router.get('/logout', function (req, res, next) {
+    req.session.twitch_id = null;
+    res.redirect(307, '/');
 });
 
 //User must be logged in past here!
@@ -327,7 +337,7 @@ router.patch('/updatemcuser', async function (req, res, next) {
     if (!('id' in mcuserinfo)) {
         return res.sendStatus(404);
     }
-    console.log(mcuserinfo);
+    // console.log(mcuserinfo);
     let sql = 'UPDATE User SET minecraft_user=?, minecraft_uuid=?, time=? WHERE twitch_id = ?;';
     req.db.get(sql, [mcuserinfo.name, mcuserinfo.id, req.body.time, req.session.twitch_id], (err, row) => {
         if (err) {
@@ -339,15 +349,10 @@ router.patch('/updatemcuser', async function (req, res, next) {
     });
 });
 
-router.get('/logout', function (req, res, next) {
-    req.session.twitch_id = null;
-    res.redirect(307, '/');
-});
-
 function updateAllUserStatus() {
     return new Promise((resolve, reject) => {
         console.log('Starting Twitch Sub Update...');
-        let sql = 'SELECT * FROM User;';
+        let sql = 'SELECT * FROM User WHERE token_access IS NOT NULL;';
         let to_update = -1;
         db.all(sql, [], async (err, rows) => {
             if (err) {
@@ -383,7 +388,7 @@ function updateAllUserStatus() {
 
 function updateMinecraftPerms() {
     console.log('Starting MineCraft Sub Update...');
-    let sql = 'SELECT twitch_id, minecraft_user, minecraft_uuid, minecraft_uuid_cache, twitch_is_sub FROM User WHERE twitch_is_sub=1 OR minecraft_uuid_cache IS NOT NULL;';
+    let sql = 'SELECT twitch_id, minecraft_user, minecraft_uuid, minecraft_uuid_cache, twitch_is_sub FROM User WHERE minecraft_uuid IS NOT NULL AND (twitch_is_sub=1 OR minecraft_uuid_cache IS NOT NULL);';
     db.each(sql, [], async (err, row) => {
         if (err) {
             console.error('Error fetching sub status from DB for update:', err);
@@ -425,6 +430,54 @@ function updateMinecraftPerms() {
     // console.log('Updated ALL');
 }
 
+function checkUsersStreaming() {
+    let sql = 'SELECT twitch_id, minecraft_user FROM User WHERE minecraft_user IS NOT NULL;';
+    db.all(sql, [], async (err, rows) => {
+       if (err) {
+           console.error(err);
+           return;
+       }
+       
+       if (rows.length > 100) {
+           console.error('More than 100 users to check if live');
+           await runMinecraftCommand('mail send eletric99 Error checking live users');
+           return;
+       }
+       
+       let creds = await asyncDBGet('SELECT token_access, token_refresh, token_expiry FROM User WHERE twitch_id=?;', ['46119918']);
+       
+       let query = [];
+       rows.forEach((row) => {
+           query.push(['user_id', row.twitch_id]);
+       });
+       
+       // runMinecraftCommand('msg eletric99 '+JSON.stringify(creds));
+       
+       res = await queryTwitchAPI('/streams', query, creds.token_access, creds.token_expiry);
+       await asyncDBGet('UPDATE User SET live=false;', []);
+       res.data.forEach(async (stream) => {
+           await asyncDBGet('UPDATE User SET live=true WHERE twitch_id=?;', [stream.user_id]);
+           // console.log("ISLIVE", stream);
+       });
+       db.each('SELECT twitch_id, live, minecraft_uuid FROM User WHERE live IS NOT live_cache', [], async (err, row) => {
+           if (err) {
+               console.error(err);
+               return;
+           }
+           if (row.live) {
+               //Save into cache, set live status
+               db.run('UPDATE User SET live_cache=true WHERE twitch_id=?', [row.twitch_id]);
+               runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add live`);
+           } else {
+               //Save into cache, un-set live status
+               db.run('UPDATE User SET live_cache=false WHERE twitch_id=?', [row.twitch_id]);
+               runMinecraftCommand(`lp user ${row.minecraft_uuid} parent remove live`);
+           }
+       });
+       // console.log(res);
+    });
+}
+
 function runMinecraftCommand(command) {
     return new Promise((resolve, reject) => {
         exec(`screen -S angelNaomiSMPServer -p 0 -X stuff "${command}^M"`, (error, stdout, stderr) => {
@@ -452,15 +505,52 @@ async function doPeriodicUpdate() {
 //           * * * * * *
 
 // Update status of all users every hour
-cron.schedule('0 * * * *', async () => {
-    console.log('Running automatic update task');
+cron.schedule('0,30 * * * *', async () => {
+    console.log('Running automatic SUB update task');
     doPeriodicUpdate();
 });
 
+cron.schedule('*/5 * * * *', () => {
+    console.log('Running automatic LIVE update task');
+    checkUsersStreaming();
+});
+
+///////////////////////////////////////////////////////////////////////
+//Twitch chat integration
+const twitchclient = new tmi.client({
+    identity: {
+        username: configs.oauth.username,
+        password: configs.oauth.password
+    },
+    channels: configs.channels
+});
+
+twitchclient.on('message', function (target, context, msg, self) {
+    if (self) { return; } // Ignore messages from the bot
+    // console.log(`TWITCH BOT: * Message:`, target, '\n', context, '\n', msg, '\n', self);
+    // console.log(`TWITCH BOT: * ${target} - ${context['display-name']}: ${msg}`)
+    if ('custom-reward-id' in context) {
+        console.log(`${context['display-name']} (${context['user-id']}) redeemed ${context['custom-reward-id']} with "${msg}"`);
+        
+        let sql = "INSERT INTO User (twitch_id, redeemed_whitelist) VALUES (?, TRUE);";
+        
+        
+    }
+    // console.log('target',target,'\ncontext',context,'\nmsg',msg,'\nself',self);
+});
+
+twitchclient.on('connected', function (addr, port) {
+    console.log(`TWITCH BOT: * Connected to ${addr}:${port}`);
+});
+
+twitchclient.connect();
+
+///////////////////////////////////////////////////////////////////////
 
 var db;
 function init() {
     doPeriodicUpdate();
+    checkUsersStreaming();
 }
 
 
