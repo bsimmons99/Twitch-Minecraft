@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+
+<head>
+  <title>SMP Twitch Link</title>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap"
+    rel="stylesheet">
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+  <script src="/javascripts/script.js" defer></script>
+</head>
+
+<body>
+  <div id="app" hidden>
+    <h1>Welcome!</h1>
+    <p v-if="!userinfo"><a href="/twitchlogin" v-on:click="logging_in=true">Login with Twitch</a></p>
+    <p v-else><a href="/logout" v-on:click="logging_in=true">Logout</a></a></p>
+    <p v-show="logging_in">Loading...</p>
+    <div v-if="userinfo">
+      <table>
+        <tr><td>Twitch Username:</td><td><span class="mono">{{ userinfo.twitch_name }}</span></td></tr>
+        <tr><td>Subscription Status:</td>
+          <td><span class="mono" v-bind:class="userinfo.twitch_sub_tier > 0 ? 'green' : 'red'">
+            <span v-if="userinfo.twitch_sub_tier > 0">Subscribed at Tier {{ userinfo.twitch_sub_tier/1000 }}</span>
+            <span v-else>Not Subscribed</span>
+          </span></td></tr>
+        <tr><td>Minecraft Username:</td><td><input class="mono" v-model="userinfo.minecraft_user"></input><button v-on:click="updatemcuser">Update</button>
+          <span v-show="update_pending">Updating...</span>
+          <span class="red" v-show="update_error === true">Username Does Not Exist</span>
+          <span class="green" v-show="update_error === false">Update Success</span>
+        </td></tr>
+        <!-- <tr><td>Minecraft UUID:</td><td><span class="mono">{{ userinfo.minecraft_uuid }}</span></td></tr> -->
+      </table>
+      <br>
+      <details>
+        <summary>Detailed User Info</summary>
+        <pre>{{ userinfo }}</pre>
+      </details>
+    </div>
+  </div>
+</body>
+
+</html>

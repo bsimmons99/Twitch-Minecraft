@@ -1,0 +1,19 @@
+{
+    "client_id": "xxx",
+    "client_secret": "xxx",
+    "redirect_uri": "https://example.com/twitchauth",
+
+    "broadcaster_info": {
+        "id": "645667972",
+        "login": "angelnaomi",
+        "display_name": "AngelNaomi",
+        "type": "",
+        "broadcaster_type": "affiliate",
+        "description": "Hii! I'm Naomi! (◕‿◕✿) I'm a full time uni student who loves playing minecraft, (and sometimes other games, too)! I really love chatting and interacting with everyone so don't feel shy in saying hi. Thanks so much for stopping by and hopefully I can see you in some of my streams!",
+        "profile_image_url": "https://static-cdn.jtvnw.net/jtv_user_pictures/1894f33d-f17a-4260-abd2-01663baed38e-profile_image-300x300.png",
+        "offline_image_url": "",
+        "created_at": "2021-02-04T02:36:18.698297Z"
+    },
+    "session_secret": "xxx",
+    "db_database_path": "tmc.db"
+}

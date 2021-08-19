@@ -1,0 +1,22 @@
+DROP TABLE IF EXISTS User;
+
+CREATE TABLE User(
+    twitch_id TEXT NOT NULL PRIMARY KEY,
+    twitch_login TEXT,
+    twitch_name TEXT,
+    token_access TEXT,
+    token_refresh TEXT,
+    token_scope TEXT,
+    token_issued INTEGER,
+    token_expiry INTEGER,
+    twitch_is_gift BOOLEAN,
+    twitch_is_sub BOOLEAN,
+    twitch_sub_tier INTEGER,
+    minecraft_user TEXT,
+    minecraft_uuid TEXT,
+    minecraft_uuid_cache TEXT,
+    time TEXT,
+    is_admin BOOLEAN DEFAULT FALSE,
+
+    UNIQUE(minecraft_user, twitch_id)
+);

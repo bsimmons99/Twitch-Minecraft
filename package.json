@@ -1,0 +1,21 @@
+{
+  "name": "twitch-minecraft",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www",
+    "mon": "nodemon ./bin/www/"
+  },
+  "dependencies": {
+    "cookie-parser": "~1.4.4",
+    "crypto-random-string": "^2.0.0",
+    "debug": "~2.6.9",
+    "express": "~4.16.1",
+    "express-session": "^1.17.2",
+    "mojang-api": "^0.0.2",
+    "morgan": "~1.9.1",
+    "node-cron": "^3.0.0",
+    "nodemon": "^2.0.7",
+    "sqlite3": "^5.0.2"
+  }
+}
