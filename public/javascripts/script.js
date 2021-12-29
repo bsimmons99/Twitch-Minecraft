@@ -66,3 +66,10 @@ var app = new Vue({
 
 app.init();
 document.getElementById('app').hidden = false;
+
+document.getElementById("username_field").addEventListener("keydown", keypress);
+function keypress(e) {
+    if (e.key === "Enter") {
+        app.updatemcuser();
+    }
+}

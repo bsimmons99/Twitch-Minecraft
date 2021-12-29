@@ -243,6 +243,33 @@ function nameToUUID(username) {
     });
 }
 
+function getSkinFromUUID(uuid) {
+    return new Promise((resolve, reject) => {
+        console.log('Request', `https://sessionserver.mojang.com/session/minecraft/profile/${uuid}`);
+        const apiReq = https.request(`https://sessionserver.mojang.com/session/minecraft/profile/${uuid}`, (res) => {
+            let data = '';
+            res.on('data', function (stream) {
+                data += stream;
+            });
+            res.on('end', function () {
+                // if (res.statusCode === 204) {
+                //     resolve({});
+                //     return;
+                // }
+                data = JSON.parse(data);
+                if ('error' in data) {
+                    reject(data);
+                } else {
+                    let link = JSON.parse(Buffer.from(data.properties[0].value, 'base64').toString()).textures.SKIN.url;
+                    link = link.replace(/^http:\/\//i, 'https://');
+                    resolve(link);
+                }
+            });
+        });
+        apiReq.end();
+    });
+}
+
 /**
  * Call to update the user info (including sub status) of a Twitch user identified by their access token
  * @param {object} db The SQLite3 database object
@@ -319,11 +346,15 @@ router.use(function (req, res, next) {
 
 router.get('/userinfo', function (req, res, next) {
     let sql = 'SELECT minecraft_user, minecraft_uuid, twitch_id, twitch_name, twitch_is_sub, twitch_sub_tier FROM User WHERE twitch_id = ?;';
-    req.db.get(sql, req.session.twitch_id, (err, row) => {
+    req.db.get(sql, req.session.twitch_id, async (err, row) => {
         if (err) {
             res.sendStatus(500);
             console.error(err);
             return;
+        }
+        // console.log(row);
+        if (row.minecraft_uuid !== undefined) {
+            row.minecraft_skin = await getSkinFromUUID(row.minecraft_uuid);
         }
         res.json(row);
     });

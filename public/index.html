@@ -30,7 +30,7 @@
             <span v-if="userinfo.twitch_sub_tier > 0">Subscribed at Tier {{ userinfo.twitch_sub_tier/1000 }}</span>
             <span v-else>Not Subscribed</span>
           </span></td></tr>
-        <tr><td>Minecraft Username:</td><td><input class="mono" v-model="userinfo.minecraft_user"></input><button v-on:click="updatemcuser">Update</button>
+        <tr><td>Minecraft Username:</td><td><input id="username_field" class="mono" v-model="userinfo.minecraft_user"></input><button v-on:click="updatemcuser">Update</button>
           <span v-show="update_pending">Updating...</span>
           <span class="red" v-show="update_error === true">Username Does Not Exist</span>
           <span class="green" v-show="update_error === false">Update Success</span>
@@ -39,6 +39,8 @@
       </table>
       <p><i>Update could take 30 minutes to take effect</i></p>
       <br>
+      <img v-if="userinfo.minecraft_skin" v-bind:src="userinfo.minecraft_skin">
+      <br v-if="userinfo.minecraft_skin">
       <details>
         <summary>Detailed User Info</summary>
         <pre>{{ userinfo }}</pre>
