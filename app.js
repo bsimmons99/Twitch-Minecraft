@@ -8,6 +8,7 @@ const sqlite3 = require('sqlite3').verbose();
 const db = new sqlite3.Database(configs.db_database_path);
 const cryptoRandomString = require('crypto-random-string');
 
+const routerInfo = require('./routes/index')(db);
 const indexRouter = routerInfo.router;
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/', indexRouter);
 app['shutdown'] = function (callback) {
     // sessionStore.close(() => {
     // console.log('Session Store Closed');
+    routerInfo.quitter();
     db.close((err) => {
         console.log('Database Closed');
         callback();
