@@ -8,8 +8,7 @@ const sqlite3 = require('sqlite3').verbose();
 const db = new sqlite3.Database(configs.db_database_path);
 const cryptoRandomString = require('crypto-random-string');
 
-const indexRouter = require('./routes/index')(db);
-const usersRouter = require('./routes/users');
+const indexRouter = routerInfo.router;
 
 const app = express();
 
@@ -55,7 +54,6 @@ app.use(function (req, res, next) {
 });
 
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
 
 
 app['shutdown'] = function (callback) {
