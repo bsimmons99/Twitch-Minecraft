@@ -1,0 +1,3 @@
+[submodule "node-rcon"]
+	path = node-rcon
+	url = https://github.com/tehbeard/node-rcon.git
