@@ -10,6 +10,7 @@ const debugRequest = require('debug')('twitch-minecraft:request');
 const debugRCON = require('debug')('twitch-minecraft:rcon');
 const debugDb_update = require('debug')('twitch-minecraft:dbUpdate');
 const debugServer_update = require('debug')('twitch-minecraft:serverUpdate');
+const debugAuth = require('debug')('twitch-minecraft:auth');
 
 const rcon = new Rcon();
 
@@ -110,7 +111,7 @@ function checkauth(req, res) {
 
 function refreshToken(twitch_id) {
     return new Promise((resolve, reject) => {
-        console.log('REFRESHING TOKEN FOR', twitch_id);
+        debugAuth('REFRESHING TOKEN FOR', twitch_id);
         let sql = 'SELECT token_refresh FROM User WHERE twitch_id=?';
         db.get(sql, [twitch_id], (err, row) => {
             if (err) {
@@ -203,10 +204,15 @@ function queryTwitchAPI(endpoint, query, access_token, token_expiry, refreshed_t
                 // console.log(data);
                 if ('error' in data) {
                     if ('status' in data && data.status === 401 && refreshed_try === undefined) {
-                        let dbres = await asyncDBGet('SELECT twitch_id FROM User WHERE token_access=?', [access_token])
-                        let twitch_id = dbres.twitch_id;
-                        access_token = (await refreshToken(twitch_id)).access_token;
-                        queryTwitchAPI(endpoint, query, access_token, null, true);
+                        let dbres = await asyncDBGet('SELECT twitch_id FROM User WHERE token_access=?', [access_token]);
+                        try {
+                            let twitch_id = dbres.twitch_id;
+                            access_token = (await refreshToken(twitch_id)).access_token;
+                            queryTwitchAPI(endpoint, query, access_token, null, true);
+                        } catch (error) {
+                            console.error(error);
+                            console.info(access_token, dbres);
+                        }
                     } else if ('status' in data && data.status === 404) {
                         return resolve(data);
                     } else {
@@ -438,23 +444,27 @@ function updateMinecraftPerms() {
         if (row.twitch_is_sub && row.minecraft_uuid_cache === null) {
             debugServer_update('NEW SUB', row.minecraft_user);
             // Add sub perms
-            await runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add sub`);
-            // cache uuid
-            db.run('UPDATE User SET minecraft_uuid_cache=? WHERE twitch_id=?', [row.minecraft_uuid, row.twitch_id]);
+            await runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add sub`, ()=>{
+                // cache uuid
+                db.run('UPDATE User SET minecraft_uuid_cache=? WHERE twitch_id=?', [row.minecraft_uuid, row.twitch_id]);
+            });
         } else if (!row.twitch_is_sub) {
             debugServer_update('UN- SUB', row.minecraft_user);
             // Remove sub perms
-            await runMinecraftCommand(`lp user ${row.minecraft_uuid_cache} parent remove sub`);
+            await runMinecraftCommand(`lp user ${row.minecraft_uuid_cache} parent remove sub`, ()=>{
             // remove cached uuid
             db.run('UPDATE User SET minecraft_uuid_cache=NULL WHERE twitch_id=?', [row.twitch_id]);
+            });
         } else if (row.minecraft_uuid !== row.minecraft_uuid_cache) {
             debugServer_update('CHG SUB', row.minecraft_user);
             // Remove sub perms
-            await runMinecraftCommand(`lp user ${row.minecraft_uuid_cache} parent remove sub`);
-            // Add sub perms
-            await runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add sub`);
-            // cache new uuid
-            db.run('UPDATE User SET minecraft_uuid_cache=? WHERE twitch_id=?', [row.minecraft_uuid, row.twitch_id]);
+            await runMinecraftCommand(`lp user ${row.minecraft_uuid_cache} parent remove sub`, async ()=>{
+                // Add sub perms
+                await runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add sub`, ()=>{
+                    // cache new uuid
+                    db.run('UPDATE User SET minecraft_uuid_cache=? WHERE twitch_id=?', [row.minecraft_uuid, row.twitch_id]);
+                });
+            });
         } else if (row.minecraft_uuid === row.minecraft_uuid_cache) {
             debugServer_update('xxx SUB', row.minecraft_user);
             //Nothing was changed, still subbed
@@ -495,19 +505,21 @@ function checkUsersStreaming() {
            await asyncDBGet('UPDATE User SET live=true WHERE twitch_id=?;', [stream.user_id]);
            // console.log("ISLIVE", stream);
        });
-       db.each('SELECT twitch_id, live, minecraft_uuid FROM User WHERE live IS NOT live_cache', [], async (err, row) => {
+       db.each('SELECT twitch_id, live, minecraft_uuid FROM User WHERE live IS NOT live_cache AND minecraft_uuid IS NOT NULL;', [], async (err, row) => {
            if (err) {
                console.error(err);
                return;
            }
            if (row.live) {
                //Save into cache, set live status
-               db.run('UPDATE User SET live_cache=true WHERE twitch_id=?', [row.twitch_id]);
-               runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add live`);
+               runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add live`, ()=>{
+                   db.run('UPDATE User SET live_cache=true WHERE twitch_id=?', [row.twitch_id]);
+               });
            } else {
                //Save into cache, un-set live status
-               db.run('UPDATE User SET live_cache=false WHERE twitch_id=?', [row.twitch_id]);
-               runMinecraftCommand(`lp user ${row.minecraft_uuid} parent remove live`);
+               runMinecraftCommand(`lp user ${row.minecraft_uuid} parent remove live`, ()=>{
+                   db.run('UPDATE User SET live_cache=false WHERE twitch_id=?', [row.twitch_id]);
+               });
            }
        });
        // console.log(res);
@@ -517,22 +529,24 @@ function checkUsersStreaming() {
 var cc = 0;
 var rconQueue = [];
 var rconRunning = false;
-async function runMinecraftCommand(command) {
-    rconQueue.push(command);
+async function runMinecraftCommand(command, callback) {
+    rconQueue.push({'command': command, 'callback': callback});
     if (!rconRunning) {
         debugRCON('Rcon Queue Started Processing');
         rconRunning = true;
         while (rconQueue.length > 0) {
             debugRCON(`QueueLength: ${rconQueue.length}`);
-            command = rconQueue.shift();
-            debugRCON(`${cc++} Attempting to send ${command}`);
+            const nextCommand = rconQueue.shift();
+            debugRCON(`${cc++} Attempting to send ${nextCommand.command}`);
             try {
                 // command = 'w eletric99 '+command;
-                let response = await rcon.send(command);
+                let response = await rcon.send(nextCommand.command);
                 debugRCON('Res:', response);
                 debugRCON('Sent!');
+                nextCommand.callback();
             } catch (error) {
                 debugRCON('An error occured', error);
+                // nextCommand.callback(error);
             }
         }
         rconRunning = false;
@@ -570,7 +584,7 @@ cron.schedule('0,30 * * * *', async () => {
     doPeriodicUpdate();
 });
 
-cron.schedule('*/1 * * * *', () => {
+cron.schedule('*/5 * * * *', () => {
     console.log('Running automatic LIVE update task');
     checkUsersStreaming();
 });
