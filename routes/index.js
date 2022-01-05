@@ -11,6 +11,7 @@ const debugRCON = require('debug')('twitch-minecraft:rcon');
 const debugDb_update = require('debug')('twitch-minecraft:dbUpdate');
 const debugServer_update = require('debug')('twitch-minecraft:serverUpdate');
 const debugAuth = require('debug')('twitch-minecraft:auth');
+const debugOther = require('debug')('twitch-minecraft:other');
 
 const rcon = new Rcon();
 
@@ -162,9 +163,6 @@ function refreshToken(twitch_id) {
 //     // res.status(ap.status);
 //     res.json([userData, ap1]);
 // });
-router.get('/twitchrefresh', async function (req, res, next) {
-    res.json(await refreshToken(46119918));
-});
 
 function asyncDBGet(query, data) {
     return new Promise(async (resolve, reject) => {
@@ -540,9 +538,13 @@ async function runMinecraftCommand(command, callback) {
             debugRCON(`${cc++} Attempting to send ${nextCommand.command}`);
             try {
                 // command = 'w eletric99 '+command;
-                let response = await rcon.send(nextCommand.command);
-                debugRCON('Res:', response);
-                debugRCON('Sent!');
+                if (configs.rcon.enabled) {
+                    let response = await rcon.send(nextCommand.command);
+                    debugRCON('Res:', response);
+                    debugRCON('Sent!');
+                } else {
+                    debugRCON('Rcon not enabled, simulating success...');
+                }
                 nextCommand.callback();
             } catch (error) {
                 debugRCON('An error occured', error);
@@ -622,9 +624,11 @@ cron.schedule('*/5 * * * *', () => {
 ///////////////////////////////////////////////////////////////////////
 
 async function setupRcon() {
-    await rcon.connect(configs.rcon.address, configs.rcon.port, configs.rcon.password);
-    // console.log(await rcon.send('list'));
-    // console.log(await runMinecraftCommand('list'));
+    if (configs.rcon.enabled) {
+        await rcon.connect(configs.rcon.address, configs.rcon.port, configs.rcon.password);
+        // console.log(await rcon.send('list'));
+        // console.log(await runMinecraftCommand('list'));
+    }
 }
 
 var db;
@@ -634,11 +638,37 @@ async function init() {
     checkUsersStreaming();
 }
 
+//////////////////
+// ADMIN ROUTES //
+//////////////////
+
+router.use(async function (req, res, next) {
+    //Get admin info
+    const sql = 'SELECT is_admin FROM User WHERE twitch_id=?;';
+    req.session.userInfo = await asyncDBGet(sql, [req.session.twitch_id]);
+    debugOther(req.session.userInfo);
+    if (req.session.userInfo.is_admin) {
+        return next();
+    }
+    res.sendStatus(401);
+});
+
+router.get('/admin/update', async function (req, res, next) {
+    await doPeriodicUpdate();
+    res.sendStatus(200);
+});
+
+// router.get('/twitchrefresh', async function (req, res, next) {
+//     res.json(await refreshToken(46119918));
+// });
+
 
 module.exports = function (database) {
     db = database;
     init();
     return {'router':router, 'quitter': () => {
-        rcon.end();
+        if (configs.rcon.enabled) {
+            rcon.end();
+        }
     }};
 }

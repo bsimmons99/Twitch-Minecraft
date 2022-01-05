@@ -23,6 +23,7 @@
     "session_secret": "xxx",
     "db_database_path": "tmc.db",
     "rcon": {
+        "enabled": true,
         "address": "localhost",
         "port": 25575,
         "password": "xxx"
