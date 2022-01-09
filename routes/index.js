@@ -428,7 +428,7 @@ function updateAllUserStatus() {
 
 function updateMinecraftPerms() {
     debugServer_update('Starting MineCraft Sub Update...');
-    let sql = 'SELECT twitch_id, minecraft_user, minecraft_uuid, minecraft_uuid_cache, twitch_is_sub FROM User WHERE minecraft_uuid IS NOT NULL AND (twitch_is_sub=1 OR minecraft_uuid_cache IS NOT NULL);';
+    let sql = 'SELECT twitch_id, minecraft_user, minecraft_uuid, minecraft_uuid_cache, twitch_is_sub, is_admin FROM User WHERE minecraft_uuid IS NOT NULL AND (twitch_is_sub=1 OR minecraft_uuid_cache IS NOT NULL);';
     db.each(sql, [], async (err, row) => {
         if (err) {
             console.error('Error fetching sub status from DB for update:', err);
@@ -450,8 +450,16 @@ function updateMinecraftPerms() {
             debugServer_update('UN- SUB', row.minecraft_user);
             // Remove sub perms
             await runMinecraftCommand(`lp user ${row.minecraft_uuid_cache} parent remove sub`, ()=>{
-            // remove cached uuid
-            db.run('UPDATE User SET minecraft_uuid_cache=NULL WHERE twitch_id=?', [row.twitch_id]);
+                // Remove the user's nickname if they are not an admin
+                if (row.is_admin !== 1) {
+                    await runMinecraftCommand(`nick ${minecraft_user} off`, ()=>{
+                        // Remove cached uuid
+                        db.run('UPDATE User SET minecraft_uuid_cache=NULL WHERE twitch_id=?', [row.twitch_id]);
+                    });
+                } else {
+                    // Remove cached uuid
+                    db.run('UPDATE User SET minecraft_uuid_cache=NULL WHERE twitch_id=?', [row.twitch_id]);
+                }
             });
         } else if (row.minecraft_uuid !== row.minecraft_uuid_cache) {
             debugServer_update('CHG SUB', row.minecraft_user);
@@ -459,8 +467,11 @@ function updateMinecraftPerms() {
             await runMinecraftCommand(`lp user ${row.minecraft_uuid_cache} parent remove sub`, async ()=>{
                 // Add sub perms
                 await runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add sub`, ()=>{
-                    // cache new uuid
-                    db.run('UPDATE User SET minecraft_uuid_cache=? WHERE twitch_id=?', [row.minecraft_uuid, row.twitch_id]);
+                    // Notify admin
+                    await runMinecraftCommand(`mail send eletric99 Check nick and perms for twitch_id:${twitch_id} (CHG SUB)`, ()=>{
+                        // cache new uuid
+                        db.run('UPDATE User SET minecraft_uuid_cache=? WHERE twitch_id=?', [row.minecraft_uuid, row.twitch_id]);
+                    });
                 });
             });
         } else if (row.minecraft_uuid === row.minecraft_uuid_cache) {
