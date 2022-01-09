@@ -678,7 +678,7 @@ router.get('/admin/allusers', async function (req, res, next) {
         }
         let page = '';
         page += '<table rules="all" style="font-family: monospace;">';
-        page += '<tr><th>twitch_id</th><th>twitch_name</th><th>twitch_sub_tier</th><th>minecraft_user</th><th>minecraft_uuid</th><th>minecraft_uuid_cache</th><th>live</th><th>Login as user</th></tr>';
+        page += '<tr><th>twitch_id</th><th>twitch_name</th><th>twitch_sub_tier</th><th>minecraft_user</th><th>minecraft_uuid</th><th>minecraft_uuid_cache</th><th>live</th><th>is_admin</th><th>Login as user</th></tr>';
         rows.forEach((e)=>{
             page += '<tr>';
             page += `<td>${e.twitch_id}</td>`;
@@ -688,6 +688,7 @@ router.get('/admin/allusers', async function (req, res, next) {
             page += `<td>${e.minecraft_uuid}</td>`;
             page += `<td>${e.minecraft_uuid_cache}</td>`;
             page += `<td>${e.live}</td>`;
+            page += `<td>${e.is_admin}</td>`;
             page += `<td><a href="/admin/login/${e.twitch_id}?go=true">Login</a></td>`;
             page += '</tr>';
         });
