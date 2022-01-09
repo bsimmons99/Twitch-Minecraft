@@ -361,8 +361,8 @@ router.get('/userinfo', function (req, res, next) {
             console.error(err);
             return;
         }
-        // console.log(row);
-        if (row.minecraft_uuid !== undefined) {
+        console.log(row);
+        if ('minecraft_uuid' in row && row.minecraft_uuid !== null) {
             row.minecraft_skin = await getSkinFromUUID(row.minecraft_uuid);
         }
         res.json(row);
