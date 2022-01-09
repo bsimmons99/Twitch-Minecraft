@@ -37,9 +37,9 @@
         </td></tr>
         <!-- <tr><td>Minecraft UUID:</td><td><span class="mono">{{ userinfo.minecraft_uuid }}</span></td></tr> -->
       </table>
-      <br>
-      <div class="skincrop">
-        <img v-if="userinfo.minecraft_skin" v-bind:src="userinfo.minecraft_skin">
+      <br v-if="userinfo.minecraft_skin">
+      <div v-if="userinfo.minecraft_skin" class="skincrop">
+        <img v-bind:src="userinfo.minecraft_skin">
       </div>
       <p><i>Update could take 30 minutes to take effect</i></p>
       <br v-if="userinfo.minecraft_skin">
