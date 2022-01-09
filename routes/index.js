@@ -449,10 +449,10 @@ function updateMinecraftPerms() {
         } else if (!row.twitch_is_sub) {
             debugServer_update('UN- SUB', row.minecraft_user);
             // Remove sub perms
-            await runMinecraftCommand(`lp user ${row.minecraft_uuid_cache} parent remove sub`, ()=>{
+            await runMinecraftCommand(`lp user ${row.minecraft_uuid_cache} parent remove sub`, async ()=>{
                 // Remove the user's nickname if they are not an admin
                 if (row.is_admin !== 1) {
-                    await runMinecraftCommand(`nick ${minecraft_user} off`, ()=>{
+                    await runMinecraftCommand(`nick ${row.minecraft_user} off`, ()=>{
                         // Remove cached uuid
                         db.run('UPDATE User SET minecraft_uuid_cache=NULL WHERE twitch_id=?', [row.twitch_id]);
                     });
@@ -466,7 +466,7 @@ function updateMinecraftPerms() {
             // Remove sub perms
             await runMinecraftCommand(`lp user ${row.minecraft_uuid_cache} parent remove sub`, async ()=>{
                 // Add sub perms
-                await runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add sub`, ()=>{
+                await runMinecraftCommand(`lp user ${row.minecraft_uuid} parent add sub`, async ()=>{
                     // Notify admin
                     await runMinecraftCommand(`mail send eletric99 Check nick and perms for twitch_id:${twitch_id} (CHG SUB)`, ()=>{
                         // cache new uuid
