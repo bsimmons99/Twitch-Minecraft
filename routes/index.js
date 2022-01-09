@@ -652,7 +652,6 @@ async function init() {
 //////////////////
 // ADMIN ROUTES //
 //////////////////
-
 router.use(async function (req, res, next) {
     //Get admin info
     const sql = 'SELECT is_admin FROM User WHERE twitch_id=?;';
@@ -667,6 +666,49 @@ router.use(async function (req, res, next) {
 router.get('/admin/update', async function (req, res, next) {
     await doPeriodicUpdate();
     res.sendStatus(200);
+});
+
+router.get('/admin/allusers', async function (req, res, next) {
+    db.all('SELECT twitch_id, twitch_name, twitch_sub_tier, minecraft_user, minecraft_uuid, minecraft_uuid_cache, live, twitch_is_gift, redeemed_whitelist, is_admin FROM User;', [], (err, rows)=>{
+        if (err) {
+            return res.status(500).json(err);
+        }
+        if (req.query.raw) {
+            return res.json(rows);
+        }
+        let page = '';
+        page += '<table rules="all" style="font-family: monospace;">';
+        page += '<tr><th>twitch_id</th><th>twitch_name</th><th>twitch_sub_tier</th><th>minecraft_user</th><th>minecraft_uuid</th><th>minecraft_uuid_cache</th><th>live</th><th>Login as user</th></tr>';
+        rows.forEach((e)=>{
+            page += '<tr>';
+            page += `<td>${e.twitch_id}</td>`;
+            page += `<td>${e.twitch_name}</td>`;
+            page += `<td>${e.twitch_sub_tier}</td>`;
+            page += `<td>${e.minecraft_user}</td>`;
+            page += `<td>${e.minecraft_uuid}</td>`;
+            page += `<td>${e.minecraft_uuid_cache}</td>`;
+            page += `<td>${e.live}</td>`;
+            page += `<td><a href="/admin/login/${e.twitch_id}?go=true">Login</a></td>`;
+            page += '</tr>';
+        });
+        page += '</table>';
+        res.send(page);
+    });
+});
+
+router.get('/admin/login/:id', async function (req, res, next) {
+    let user = await asyncDBGet('SELECT twitch_id, twitch_name FROM User WHERE twitch_id=?;', [req.params.id]);
+    // console.log('user', user);
+    if (user !== undefined && user !== null) {
+        if (req.query.go) {
+            req.session.twitch_id = req.params.id;
+            res.redirect('/');
+        } else {
+            res.send(`<a href="/admin/login/${user.twitch_id}?go=true">Login as (${user.twitch_id}) ${user.twitch_name}</a>`);
+        }
+    } else {
+        res.sendStatus(404);
+    }
 });
 
 // router.get('/twitchrefresh', async function (req, res, next) {
